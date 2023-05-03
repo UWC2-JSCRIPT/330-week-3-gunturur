@@ -12,5 +12,6 @@ const bookSchema = new mongoose.Schema({
   pageCount: { type: Number, required: true }
 });
 
+bookSchema.index({ authorId: 1 });
 
 module.exports = mongoose.model("books", bookSchema);
