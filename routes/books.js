@@ -2,22 +2,68 @@ const { Router } = require("express");
 const router = Router();
 
 const bookDAO = require('../daos/book');
+const { getAuthorStats } = require("../daos/book");
+const { searchBooks } = require("../daos/book");
+const { searchBooksMulti } = require("../daos/book");
+const { getBookStats } = require("../daos/book");
 
 // Create
 router.post("/", async (req, res, next) => {
   const book = req.body;
-  if (!book || JSON.stringify(book) === '{}' ) {
+  if (!book || JSON.stringify(book) === '{}') {
     res.status(400).send('book is required');
   } else {
     try {
+      // Check if a book with the same ISBN already exists
+      const existingBook = await bookDAO.getBookByISBN(book.ISBN);
+      if (existingBook) {
+        res.status(400).send("A book with this ISBN already exists");
+        return;
+      }
+
       const savedBook = await bookDAO.create(book);
-      res.json(savedBook); 
-    } catch(e) {
+      res.status(200).json(savedBook);
+    } catch (e) {
       if (e instanceof bookDAO.BadDataError) {
         res.status(400).send(e.message);
       } else {
         res.status(500).send(e.message);
       }
+    }
+  }
+});
+
+// Search books
+router.get("/search", async (req, res, next) => {
+  try {
+    const query = req.query.query;
+    if (!query) {
+      return res.status(400).send("query parameter is required");
+    }
+    const matchingBooks = await bookDAO.searchBooks(query);
+    if (!matchingBooks) {
+      return res.status(404).send("No matching books found");
+    }
+    return res.status(200).json(matchingBooks);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).send("Internal server error");
+  }
+});
+
+
+// Search books
+router.get("/searchMulti", async (req, res, next) => {
+  const query = req.query.query;
+  if (!query) {
+    res.status(400).send("query parameter is required");
+  } else {
+    try {
+      const matchingBooks = await bookDAO.searchBooksMulti(query);
+      res.status(200).json(matchingBooks);
+    } catch (e) {
+      console.error(e);
+      res.status(500).send(e.message);
     }
   }
 });
@@ -48,20 +94,21 @@ router.get("/", async (req, res, next) => {
   res.json(books);
 });
 
-// Search books
-router.get("/search", async (req, res, next) => {
-  const { query } = req.query;
-  if (!query) {
-    res.status(400).send("query parameter is required");
-  } else {
-    try {
-      const matchingBooks = await bookDAO.searchBooks(query);
-      res.json(matchingBooks);
-    } catch (e) {
-      res.status(500).send(e.message);
-    }
+
+// Get authors stats
+router.get("/authors/stats", async (req, res) => {
+  try {
+    const authorInfo = req.query.authorInfo === "true";
+    const stats = await bookDAO.getAuthorStats(authorInfo);
+    console.log('Stats:', stats); // Add this line to log the stats
+    res.status(200).json(stats);
+  } catch (error) {
+    console.error('Error:', error); // Add this line to log the error
+    res.status(500).send({ error: "An error occurred while getting author stats" });
   }
 });
+
+
 
 
 // Update
